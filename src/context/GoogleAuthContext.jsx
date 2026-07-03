@@ -163,6 +163,10 @@ export const GoogleAuthProvider = ({ children }) => {
     try {
       const verifier = generateCodeVerifier();
       sessionStorage.setItem('oauth_code_verifier', verifier);
+      
+      // Generate cryptographically secure state for CSRF protection
+      const state = generateCodeVerifier();
+      sessionStorage.setItem('oauth_state', state);
 
       const challenge = await generateCodeChallenge(verifier);
       const redirectUri = getRedirectUri();
@@ -178,6 +182,7 @@ export const GoogleAuthProvider = ({ children }) => {
       authUrl.searchParams.set('redirect_uri', redirectUri);
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('scope', scopes);
+      authUrl.searchParams.set('state', state);
       authUrl.searchParams.set('code_challenge', challenge);
       authUrl.searchParams.set('code_challenge_method', 'S256');
       authUrl.searchParams.set('access_type', 'offline'); // To get refresh token
@@ -192,13 +197,23 @@ export const GoogleAuthProvider = ({ children }) => {
   };
 
   // Handle URL callback containing authorization code
-  const handleAuthCallback = useCallback(async (code) => {
+  const handleAuthCallback = useCallback(async (code, stateFromUrl) => {
     const codeVerifier = sessionStorage.getItem('oauth_code_verifier');
+    const savedState = sessionStorage.getItem('oauth_state');
+    
     if (!codeVerifier) {
       setError('Відсутній перевірочний ключ авторизації (code verifier). Спробуйте ще раз.');
       setIsLoading(false);
       return;
     }
+
+    if (!stateFromUrl || stateFromUrl !== savedState) {
+      setError('Помилка валідації CSRF (недійсний стан/state). Авторизацію відхилено.');
+      setIsLoading(false);
+      return;
+    }
+
+    sessionStorage.removeItem('oauth_state');
 
     try {
       setError(null);
@@ -263,11 +278,12 @@ export const GoogleAuthProvider = ({ children }) => {
     const initAuth = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
+      const state = urlParams.get('state');
 
       if (code) {
         // We have redirected back with auth code
         if (clientId) {
-          await handleAuthCallback(code);
+          await handleAuthCallback(code, state);
         } else {
           setError('Вхід скасовано. Будь ласка, вкажіть Google Client ID.');
           setIsLoading(false);
