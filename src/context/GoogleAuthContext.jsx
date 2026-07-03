@@ -10,6 +10,10 @@ export const GoogleAuthProvider = ({ children }) => {
     return localStorage.getItem('google_client_id') || '';
   });
   
+  const [clientSecret, setClientSecret] = useState(() => {
+    return localStorage.getItem('google_client_secret') || '';
+  });
+  
   const [accessToken, setAccessToken] = useState(() => {
     return localStorage.getItem('google_access_token') || '';
   });
@@ -41,6 +45,17 @@ export const GoogleAuthProvider = ({ children }) => {
     } else {
       localStorage.removeItem('google_client_id');
       logout();
+    }
+  };
+
+  // Save/change Google OAuth Client Secret
+  const updateClientSecret = (secret) => {
+    const cleanSecret = secret.trim();
+    setClientSecret(cleanSecret);
+    if (cleanSecret) {
+      localStorage.setItem('google_client_secret', cleanSecret);
+    } else {
+      localStorage.removeItem('google_client_secret');
     }
   };
 
@@ -92,16 +107,21 @@ export const GoogleAuthProvider = ({ children }) => {
     }
 
     try {
+      const bodyParams = {
+        client_id: clientId,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      };
+      if (clientSecret) {
+        bodyParams.client_secret = clientSecret;
+      }
+
       const response = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({
-          client_id: clientId,
-          refresh_token: refreshToken,
-          grant_type: 'refresh_token',
-        }),
+        body: new URLSearchParams(bodyParams),
       });
 
       if (!response.ok) {
@@ -130,7 +150,7 @@ export const GoogleAuthProvider = ({ children }) => {
       logout();
       return null;
     }
-  }, [clientId, refreshToken, logout]);
+  }, [clientId, clientSecret, refreshToken, logout]);
 
   // Initiate OAuth 2.0 PKCE login redirect
   const login = async () => {
@@ -184,18 +204,23 @@ export const GoogleAuthProvider = ({ children }) => {
       setError(null);
       const redirectUri = getRedirectUri();
       
+      const bodyParams = {
+        client_id: clientId,
+        code_verifier: codeVerifier,
+        code: code,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      };
+      if (clientSecret) {
+        bodyParams.client_secret = clientSecret;
+      }
+
       const response = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({
-          client_id: clientId,
-          code_verifier: codeVerifier,
-          code: code,
-          redirect_uri: redirectUri,
-          grant_type: 'authorization_code',
-        }),
+        body: new URLSearchParams(bodyParams),
       });
 
       if (!response.ok) {
@@ -231,7 +256,7 @@ export const GoogleAuthProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [clientId, fetchUserProfile, logout]);
+  }, [clientId, clientSecret, fetchUserProfile, logout]);
 
   // Initial load check
   useEffect(() => {
@@ -291,12 +316,14 @@ export const GoogleAuthProvider = ({ children }) => {
     <GoogleAuthContext.Provider
       value={{
         clientId,
+        clientSecret,
         accessToken,
         user,
         isAuthenticated,
         isLoading,
         error,
         updateClientId,
+        updateClientSecret,
         login,
         logout,
         refreshGoogleToken,

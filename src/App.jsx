@@ -15,12 +15,14 @@ import {
 function AppContent() {
   const {
     clientId,
+    clientSecret,
     accessToken,
     user,
     isAuthenticated,
     isLoading,
     error: authError,
     updateClientId,
+    updateClientSecret,
     login,
     logout
   } = useGoogleAuth();
@@ -33,6 +35,8 @@ function AppContent() {
   const [activeTask, setActiveTask] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [tempClientId, setTempClientId] = useState(clientId);
+  const [tempClientSecret, setTempClientSecret] = useState(clientSecret);
+  const [showSecret, setShowSecret] = useState(false);
   const [toasts, setToasts] = useState([]);
 
   // Toast notification helper
@@ -44,10 +48,11 @@ function AppContent() {
     }, 4000);
   }, []);
 
-  // Sync tempClientId state when context loaded
+  // Sync temp states when context loaded
   useEffect(() => {
     setTempClientId(clientId);
-  }, [clientId]);
+    setTempClientSecret(clientSecret);
+  }, [clientId, clientSecret]);
 
   // Persist tasks to localStorage
   useEffect(() => {
@@ -238,12 +243,13 @@ function AppContent() {
     }
   };
 
-  // Save Settings (Client ID)
+  // Save Settings (Client ID & Secret)
   const handleSaveSettings = (e) => {
     e.preventDefault();
     updateClientId(tempClientId);
+    updateClientSecret(tempClientSecret);
     setShowSettings(false);
-    addToast('Google Client ID збережено', 'success');
+    addToast('Налаштування Google інтеграції збережено', 'success');
   };
 
   return (
@@ -336,20 +342,54 @@ function AppContent() {
               </span>
             </div>
           </div>
-          <form onSubmit={handleSaveSettings} className="client-id-form">
-            <input
-              type="text"
-              placeholder="Вставте ваш Google Client ID тут..."
-              value={tempClientId}
-              onChange={(e) => setTempClientId(e.target.value)}
-              required
-            />
-            <button type="submit" className="btn btn-primary">Зберегти</button>
-            {clientId && (
-              <button type="button" className="btn btn-secondary" onClick={() => setShowSettings(false)}>
-                Скасувати
-              </button>
-            )}
+          <form onSubmit={handleSaveSettings} className="client-id-form" style={{ flexDirection: 'column', alignItems: 'stretch', maxWidth: '400px', width: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <input
+                type="text"
+                placeholder="Вставте ваш Google Client ID тут..."
+                value={tempClientId}
+                onChange={(e) => setTempClientId(e.target.value)}
+                required
+                style={{ maxWidth: 'none' }}
+              />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input
+                  type={showSecret ? 'text' : 'password'}
+                  placeholder="Вставте ваш Google Client Secret тут..."
+                  value={tempClientSecret}
+                  onChange={(e) => setTempClientSecret(e.target.value)}
+                  required
+                  style={{ maxWidth: 'none', paddingRight: '40px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSecret(!showSecret)}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--color-text-secondary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '4px'
+                  }}
+                  title={showSecret ? 'Приховати секрет' : 'Показати секрет'}
+                >
+                  {showSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px', justifyContent: 'flex-end' }}>
+              <button type="submit" className="btn btn-primary">Зберегти</button>
+              {clientId && (
+                <button type="button" className="btn btn-secondary" onClick={() => setShowSettings(false)}>
+                  Скасувати
+                </button>
+              )}
+            </div>
           </form>
         </div>
       )}
