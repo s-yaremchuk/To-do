@@ -38,6 +38,9 @@ jobs:
         run: npm install
 
       - name: Run Build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_CLIENT_SECRET: ${{ secrets.VITE_GOOGLE_CLIENT_SECRET }}
         run: npm run build
 
       - name: Setup Pages
