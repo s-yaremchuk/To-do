@@ -16,6 +16,7 @@ function AppContent() {
   const {
     clientId,
     clientSecret,
+    isEnvConfigured,
     accessToken,
     user,
     isAuthenticated,
@@ -296,14 +297,16 @@ function AppContent() {
             </>
           ) : (
             <>
-              <button 
-                onClick={() => setShowSettings(!showSettings)} 
-                className="btn btn-secondary"
-                title="Налаштування інтеграції Google"
-              >
-                <Settings size={16} />
-                Налаштування
-              </button>
+              {!isEnvConfigured && (
+                <button 
+                  onClick={() => setShowSettings(!showSettings)} 
+                  className="btn btn-secondary"
+                  title="Налаштування інтеграції Google"
+                >
+                  <Settings size={16} />
+                  Налаштування
+                </button>
+              )}
               <button 
                 onClick={login} 
                 className="btn btn-primary"
@@ -325,7 +328,7 @@ function AppContent() {
       )}
 
       {/* Google Integration Settings Drawer */}
-      {(showSettings || !clientId) && (
+      {!isEnvConfigured && (showSettings || !clientId) && (
         <div className="client-id-bar">
           <div className="client-id-info">
             <h3>⚙️ Налаштування інтеграції з Google Calendar</h3>

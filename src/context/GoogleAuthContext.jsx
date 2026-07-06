@@ -7,12 +7,14 @@ export const useGoogleAuth = () => useContext(GoogleAuthContext);
 
 export const GoogleAuthProvider = ({ children }) => {
   const [clientId, setClientId] = useState(() => {
-    return localStorage.getItem('google_client_id') || '';
+    return import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem('google_client_id') || '';
   });
   
   const [clientSecret, setClientSecret] = useState(() => {
-    return localStorage.getItem('google_client_secret') || '';
+    return import.meta.env.VITE_GOOGLE_CLIENT_SECRET || localStorage.getItem('google_client_secret') || '';
   });
+
+  const isEnvConfigured = !!(import.meta.env.VITE_GOOGLE_CLIENT_ID && import.meta.env.VITE_GOOGLE_CLIENT_SECRET);
   
   const [accessToken, setAccessToken] = useState(() => {
     return localStorage.getItem('google_access_token') || '';
@@ -38,6 +40,7 @@ export const GoogleAuthProvider = ({ children }) => {
 
   // Save/change Google OAuth Client ID
   const updateClientId = (id) => {
+    if (isEnvConfigured) return;
     const cleanId = id.trim();
     setClientId(cleanId);
     if (cleanId) {
@@ -50,6 +53,7 @@ export const GoogleAuthProvider = ({ children }) => {
 
   // Save/change Google OAuth Client Secret
   const updateClientSecret = (secret) => {
+    if (isEnvConfigured) return;
     const cleanSecret = secret.trim();
     setClientSecret(cleanSecret);
     if (cleanSecret) {
@@ -333,6 +337,7 @@ export const GoogleAuthProvider = ({ children }) => {
       value={{
         clientId,
         clientSecret,
+        isEnvConfigured,
         accessToken,
         user,
         isAuthenticated,
