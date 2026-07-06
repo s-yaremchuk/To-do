@@ -1,127 +1,112 @@
-# Smart To-Do · Розумний список задач з Google Calendar
+# Smart To-Do
 
-Розумний та естетичний планувальник завдань з автоматичною двосторонньою синхронізацією з **Google Calendar API** та авторизацією **OAuth 2.0 PKCE**.
+Клієнтський додаток для планування завдань з двосторонньою синхронізацією подій з сервісом Google Calendar. Додаток розроблено як Static Web Application (SPA), що працює повністю на стороні клієнта без власного бекенд-сервера.
 
-![Palette: Slate #202940 / Brown #4B4038 / Taupe #9A8678 / Sand #CAAA98](https://placehold.co/600x80/202940/CAAA98?text=SMART+TO-DO+·+GOOGLE+CALENDAR&font=mono)
+## Технологічний стек
 
----
+*   **Фреймворк**: React 19.2.7 (React DOM 19.2.7)
+*   **Складальник проекту**: Vite 8.1.1 (з плагіном `@vitejs/plugin-react` v6.0.3)
+*   **Стилізація**: Vanilla CSS (CSS Variables)
+*   **Бібліотека іконок**: Lucide React 1.23.0
+*   **Аналізатор коду (Linter)**: Oxlint 1.71.0
+*   **Протокол авторизації**: OAuth 2.0 PKCE (Proof Key for Code Exchange)
+*   **Базове сховище даних**: Web Storage API (localStorage)
+
+## Архітектура
+
+Проект побудовано за тришаровою клієнтською архітектурою:
+
+1.  **Presentation Layer (Шар відображення)**:
+    *   `src/App.jsx` — центральний вузол додатку, що координує взаємодію інтерфейсу з бізнес-логікою та локальним сховищем.
+    *   `src/components/TaskForm.jsx` — інтерфейс додавання та редагування завдань з вбудованою валідацією полів.
+    *   `src/components/TaskList.jsx` — інтерфейс виведення списку завдань із підтримкою фільтрації (Всі, Активні, Виконані).
+2.  **Business Logic Layer (Шар бізнес-логіки)**:
+    *   `src/context/GoogleAuthContext.jsx` — React Context Provider, який управляє станом авторизації користувача, обміном кодів на токени, перевіркою валідності сесії та механізмом оновлення Access Token (Silent Refresh).
+3.  **Data Access Layer (Шар доступу до даних)**:
+    *   `src/services/googleCalendar.js` — сервісний модуль для взаємодії з REST API Google Calendar за допомогою асинхронних HTTP-запитів.
+    *   `src/utils/pkce.js` — утиліти для забезпечення безпеки авторизації (генерація SHA-256 Code Challenge, Code Verifier та випадкових станів CSRF-валідації через Web Crypto API).
+
+### Патерни та підходи
+
+*   **React Context Pattern**: використовується для глобального доступу до стану авторизації та облікових даних клієнта (`useGoogleAuth`) без необхідності прокидання пропсів через проміжні компоненти (prop drilling).
+*   **Service Pattern**: виділення мережевих запитів до Google Calendar API в окремий модуль `googleCalendar.js` для ізоляції логіки роботи з зовнішньою системою.
+*   **State Machine (Синхронізація)**: стан кожної задачі описується властивостями статусу синхронізації (`local`, `syncing`, `synced`, `failed`), що дозволяє обробляти помилки мережі та проводити повторну пакетну синхронізацію.
+
+### Схема взаємодії компонентів
+
+```mermaid
+sequenceDiagram
+    participant UI as UI Components (App / Form / List)
+    participant Auth as GoogleAuthContext (OAuth 2.0 PKCE)
+    participant Service as Google Calendar API Service
+    participant Local as LocalStorage
+    
+    UI->>Auth: Check Auth Status
+    Auth-->>UI: Return Profile & Access Token
+    UI->>Local: Read/Write Tasks (Offline Fallback)
+    alt Authenticated & Google Sync Enabled
+        UI->>Service: Send CRUD HTTP Request (POST/PATCH/DELETE)
+        Service-->>UI: Return HTTP status & Google Event ID
+        UI->>Local: Update Sync Status (synced)
+    else Offline / Not Authenticated
+        UI->>Local: Save task with local-only status
+    end
+```
+
+### Технічні рішення та Trade-offs
+
+*   **Безсерверний OAuth PKCE**: Оскільки додаток є статичним клієнтським додатком, автентифікація реалізована за стандартом PKCE. Це виключає потребу у виділеному сервері для обміну кодів авторизації. Зберігання `Client ID` та `Client Secret` реалізовано через змінні оточення Vite (`import.meta.env`) з можливістю динамічного введення користувачем в UI (зберігаються в `localStorage`).
+*   **Локальна стійкість (Offline-first)**: Додаток зберігає всі дані локально. При відновленні з'єднання або після авторизації користувач може синхронізувати локально створені завдання з Google Calendar.
 
 ## Функціонал
 
-- 🗓️ **Інтеграція з Google Calendar** — завдання автоматично створюються, редагуються та видаляються у вашому реальному Google Календарі.
-- 🔐 **OAuth 2.0 PKCE** — безпечна авторизація на стороні клієнта (SPA) без використання сторонніх серверів чи баз даних.
-- 💻 **Локальний режим (Offline)** — додаток працює як локальний To-Do список через `localStorage` навіть без авторизації Google.
-- 🔄 **Пакетна синхронізація** — кнопка «Синхронізувати все» для автоматичного вивантаження локальних завдань у календар після входу.
-- 📝 **Форми та Валідація** — детальні перевірки вводу (назва від 3-х символів, дата завершення не може бути ранішою за дату початку).
-- 🎨 **Преміальний дизайн** — адаптивний скляний інтерфейс (glassmorphism) на основі спеціальної колірної палітри з мікроанімаціями.
-- 🛡️ **Кібербезпека** — впроваджено захист від CSRF атак через перевірку OAuth `state` та захист від XSS через Content Security Policy (CSP).
+*   **Управління завданнями (CRUD)**: створення, читання, оновлення статусу виконання, повне видалення завдань.
+*   **Синхронізація подій**:
+    *   Створення події у Google Calendar при додаванні завдання в додатку.
+    *   Автоматична зміна назви події (додавання префіксу `✓`) у календарі при позначенні завдання як виконаного.
+    *   Видалення події з календаря при видаленні завдання в додатку.
+*   **Автентифікація Google**: безпечний вхід через спливаюче вікно (popup), автоматичне оновлення токенів без переривання роботи користувача (Token Refresh Flow).
+*   **Локальний бекап**: збереження невивантажених завдань при проблемах з інтернет-з'єднанням.
 
----
+## Встановлення та запуск
 
-## Дизайн та Палітра
+### Вимоги до оточення
 
-Інтерфейс побудований на глибоких темних та теплих земляних відтінках:
-- **Основний фон**: Slate Blue `#202940`
-- **Картки та панелі**: Deep Warm Brown `#4B4038`
-- **Межі та другорядний текст**: Muted Taupe `#9A8678`
-- **Акценти та активний текст**: Light Warm Sand `#CAAA98`
-- **Шрифт**: [Outfit](https://fonts.google.com/specimen/Outfit) (Google Fonts)
+*   Node.js (рекомендовано v20 або вище)
+*   npm (або yarn)
 
----
+### Налаштування змінних середовища
 
-## Запуск локально
+Для роботи автоматичної підстановки ключів Google API створіть файл `.env` в кореневому каталозі проекту:
 
-```bash
-# Встановлення залежностей
-npm install
-
-# Запуск сервера розробки
-npm run dev
-```
-
-Відкрийте у браузері: **http://127.0.0.1:3000**
-
----
-
-## Налаштування Google Cloud Console
-
-Оскільки додаток є статичним клієнтським додатком (SPA), для роботи з календарем потрібні власні облікові дані Google API:
-
-### 1. Налаштування екрану згоди (OAuth consent screen)
-1. Перейдіть у [Google Cloud Console](https://console.cloud.google.com/).
-2. Створіть проект, перейдіть в **OAuth consent screen**, оберіть тип **External**.
-3. У вкладке **Audience** (Тестові користувачі) обов'язково додайте свою поштову скриньку Google (наприклад, `your-email@gmail.com`).
-4. У вкладці **Data Access** (Дозволи) додайте область (scope) **`.../auth/calendar.events`** (Google Calendar API).
-
-### 2. Створення OAuth Client Credentials
-1. Перейдіть у розділ **Clients** (Credentials) -> **Create Credentials** -> **OAuth client ID**.
-2. Оберіть тип додатку: **Web application**.
-3. Додайте **Authorized JavaScript origins**:
-   - `http://localhost:3000`
-   - `http://127.0.0.1:3000`
-4. Додайте **Authorized redirect URIs**:
-   - `http://localhost:3000`
-   - `http://127.0.0.1:3000`
-   - `http://localhost:3000/`
-   - `http://127.0.0.1:3000/`
-5. Натисніть **Create** та скопіюйте **Client ID** та **Client Secret**.
-
-### 3. Локальна конфігурація
-Створіть файл `.env` у корені проекту (доданий в `.gitignore`):
 ```env
-VITE_GOOGLE_CLIENT_ID=ваш_google_client_id_тут
-VITE_GOOGLE_CLIENT_SECRET=ваш_google_client_secret_тут
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
+VITE_GOOGLE_CLIENT_SECRET=your_google_client_secret
 ```
 
----
+### Запуск додатку
 
-## Деплой на GitHub Pages
+1.  Встановіть залежності:
+    ```bash
+    npm install
+    ```
+2.  Запустіть локальний сервер розробки:
+    ```bash
+    npm run dev
+    ```
+    *Проект буде запущений на http://127.0.0.1:3000.*
 
-Проект настроєний на автоматичний деплой через GitHub Actions при пуші в гілку `main`.
+3.  Збірка для виробничого середовища:
+    ```bash
+    npm run build
+    ```
 
-### 1. Налаштування секретів у репозиторії
-Для безпечного збирання без витоку ключів у публічний код додайте їх як **Secrets** у вашому репозиторії на GitHub:
-1. Зайдіть у ваш репозиторій -> **Settings** -> **Secrets and variables** -> **Actions**.
-2. Створіть новий секрет **`VITE_GOOGLE_CLIENT_ID`** та вставте ваш Client ID.
-3. Створіть новий секрет **`VITE_GOOGLE_CLIENT_SECRET`** та вставте ваш Client Secret.
+## Тестування
 
-### 2. Налаштування джерела деплою
-У налаштуваннях репозиторію (**Settings** -> **Pages**) у розділі **Source** змініть джерело з *Deploy from a branch* на **GitHub Actions**.
+Автоматизоване тестування (unit- чи integration-тести) у поточному репозиторії відсутнє. [TODO: уточнити]
 
-### 3. Оновлення Redirect URIs в Google Console
-Додайте адресу вашого живого сайту в дозволені посилання вашого OAuth клієнта в Google Cloud Console:
-- **Javascript Origins**: `https://<your-username>.github.io`
-- **Redirect URIs**: 
-  - `https://<your-username>.github.io/To-do/`
-  - `https://<your-username>.github.io/To-do`
+## Обмеження та відомі недоліки
 
----
-
-## Структура проєкту
-
-```
-Smart_To_Do/
-├── .github/workflows/
-│   └── deploy.yml      — Конфігурація автодеплою на GitHub Pages
-├── .agents/skills/     — Набір скілсів розробника для Gemini
-├── public/
-│   └── favicon.svg     — Кастомний логотип-галочка проекту
-├── src/
-│   ├── components/
-│   │   ├── TaskForm.jsx — Форма створення/редагування задач та валідація
-│   │   └── TaskList.jsx — Список завдань з фільтрами та статусами
-│   ├── context/
-│   │   └── GoogleAuthContext.jsx — Контекст авторизації OAuth 2.0 PKCE
-│   ├── services/
-│   │   └── googleCalendar.js    — Взаємодія з Google Calendar API
-│   ├── utils/
-│   │   └── pkce.js     — Генерація verifier & challenge для OAuth
-│   ├── App.css         — Заглушка стилів
-│   ├── App.jsx         — Головний хаб додатка, toasts та логіка операцій
-│   ├── index.css       — Дизайн-система (змінні, скляний стиль, сітка)
-│   └── main.jsx        — Вхідна точка React додатка
-├── index.html          — Головний HTML-файл з налаштуваннями SEO та CSP
-├── vite.config.js      — Конфігурація збірки з динамічним base path
-├── package.json        — Залежності та скрипти збірки
-└── README.md           — Ця документація
-```
+*   **Залежність від середовища браузера**: Використання об'єктів `window.localStorage` та `window.sessionStorage` обмежує сумісність з Server-Side Rendering (SSR) технологіями без додаткових перевірок.
+*   **Відсутність мультидевайсної синхронізації**: Завдання, які не були синхронізовані з Google Calendar, існують виключно в межах локального сховища поточного браузера на конкретному пристрої.
+*   **Безпека Client Secret на клієнті**: Незважаючи на використання PKCE, для типу клієнта "Web application" Google вимагає передачу `client_secret`. Передача та зберігання секрету на клієнті є компромісом безпеки для забезпечення безсерверної архітектури.
